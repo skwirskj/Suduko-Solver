@@ -18,11 +18,12 @@ def plt_many_img(images, titles, rows=1, columns=2):
         plt.xticks([]), plt.yticks([])
 
 
-def show_digits(digits, color=255):
+def show_digits(digits, colour=255):
+    """Shows list of 81 extracted digits in a grid format"""
     rows = []
-    with_border = [cv2.copyMakeBorder(img.copy(), 1, 1, 1, 1, cv2.BORDER_CONSTANT, None, color) for img in digits]
+    with_border = [cv2.copyMakeBorder(img.copy(), 1, 1, 1, 1, cv2.BORDER_CONSTANT, None, colour) for img in digits]
     for i in range(9):
-        row = np.concatenate(with_border[i * 9: ((i + 1) * 9)], axis=1)
+        row = np.concatenate(with_border[i * 9:((i + 1) * 9)], axis=1)
         rows.append(row)
     show_img(np.concatenate(rows))
 
@@ -199,7 +200,7 @@ def find_largest_feature(inp_img, scan_tl=None, scan_br=None):
     if all([p is not None for p in seed_point]):
         cv2.floodFill(img, mask, seed_point, 255)
 
-    top, bottom, left, right = heigh, 0, width, 0
+    top, bottom, left, right = height, 0, width, 0
 
     for x in range(width):
         for y in range(height):
@@ -215,3 +216,45 @@ def find_largest_feature(inp_img, scan_tl=None, scan_br=None):
     bbox = [[left, top], [right, bottom]]
     return img, np.array(bbox, dtype='float32'), seed_point
 
+
+def extract_digit(img, rect, size):
+    digit = cut_from_rect(img, rect)
+
+    h, w = digit.shape[:2]
+    margin = int(np.mean([h, w]) / 2.5)
+    _, bbox, seed = find_largest_feature(digit, [margin, margin], [w - margin, h - margin])
+    digit = cut_from_rect(digit, bbox)
+
+    w = bbox[1][0] - bbox[0][0]
+    h = bbox[1][1] - bbox[0][1]
+
+    if w > 0 and h > 0 and (w * h) > 100 and len(digit) > 0:
+        return scale_and_center(digit, size)
+    else:
+        return np.zeros((size, size), np.uint8)
+
+
+def get_digits(img, squares, size):
+    digits = []
+    img = preprocess_board(img.copy(), False)
+    for square in squares:
+        digits.append(extract_digit(img, square, size))
+    return digits
+
+
+def parse_grid(path):
+    orig = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+    processed = preprocess_board(orig)
+    corners = find_corners(processed)
+    cropped = crop_and_wrap(orig, corners)
+    squares = infer_grid(cropped)
+    digits = get_digits(cropped, squares, 28)
+    show_digits(digits)
+
+
+def main():
+    parse_grid('sudukoBoard1.png')
+
+
+if __name__ == '__main__':
+    main()
